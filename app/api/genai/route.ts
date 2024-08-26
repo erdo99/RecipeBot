@@ -1,5 +1,8 @@
 import { StreamingTextResponse, GoogleGenerativeAIStream, Message } from "ai";
+import { PrismaClient } from '@prisma/client';
 import { GoogleGenerativeAI, Content } from "@google/generative-ai";
+
+const prisma = new PrismaClient();
 // IMPORTANT! Set the runtime to edge
  export const runtime = "edge";
  //export const xx = "You are a helpful AI chef specializing in providing delicious and easy-to-follow recipes. Your primary task is to suggest recipes based on user preferences, ingredients they have on hand, or specific dietary needs. You should always be polite, concise, and make sure the recipes are clear and detailed, suitable for users of all cooking levels. You go straight to the point.";
@@ -11,6 +14,17 @@ export async function POST(req: Request, res: Response) {
   // if imageparts exist then take the last user message as prompt
   let modelName: string;
   let promptWithParts: any;
+  const userQuestion = messages.find((message) => message.role === "user")?.content ?? "";  try {
+    const existingEntry = await prisma.questionAnswer.findUnique({
+      where: { question: userQuestion },
+    });
+    if (existingEntry) {
+      return new Response(existingEntry.answer);
+    }
+  } catch (error) {
+    console.error("Database error:", error);
+  }
+  
   
   if (imageParts.length > 0) {
     modelName = "gemini-1.5-pro";
@@ -35,12 +49,27 @@ export async function POST(req: Request, res: Response) {
     
   });
 
+  
+
   console.log("MODELNAME: " + modelName);
   console.log("PROMPT WITH PARTS: ");
   console.log(promptWithParts);
   const streamingResponse = await model.generateContentStream(promptWithParts);
+  try {
+    const fullResponse = await streamingResponse.response;
+    const answer = fullResponse.text();
+    await prisma.questionAnswer.create({
+      data: {
+        question: userQuestion,
+        answer: answer,
+      },
+    });
+  } catch (error) {
+    console.error("Error saving to database:", error);
+  }
   return new StreamingTextResponse(GoogleGenerativeAIStream(streamingResponse));
 }
+
 
 function buildGoogleGenAIPrompt(messages: Message[] ) {
   const systemInstruction = "You are a helpful AI chef specializing in providing delicious and easy-to-follow recipes. Your primary task is to suggest recipes based on user preferences, ingredients they have on hand, or specific dietary needs. You should always be polite, concise, and make sure the recipes are clear and detailed, suitable for users of all cooking levels. You go straight to the point.";
