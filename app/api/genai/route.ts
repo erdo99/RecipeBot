@@ -1,11 +1,9 @@
 import { StreamingTextResponse, GoogleGenerativeAIStream, Message } from "ai";
-import { PrismaClient } from '@prisma/client';
 import { GoogleGenerativeAI, Content } from "@google/generative-ai";
-
-const prisma = new PrismaClient();
+import { PrismaClient } from '@prisma/client';
 // IMPORTANT! Set the runtime to edge
- export const runtime = "edge";
- //export const xx = "You are a helpful AI chef specializing in providing delicious and easy-to-follow recipes. Your primary task is to suggest recipes based on user preferences, ingredients they have on hand, or specific dietary needs. You should always be polite, concise, and make sure the recipes are clear and detailed, suitable for users of all cooking levels. You go straight to the point.";
+const prisma = new PrismaClient();
+//export const runtime = "edge";
 export async function POST(req: Request, res: Response) {
   const reqBody = await req.json();
   const images: string[] = JSON.parse(reqBody.data.images);
@@ -14,21 +12,28 @@ export async function POST(req: Request, res: Response) {
   // if imageparts exist then take the last user message as prompt
   let modelName: string;
   let promptWithParts: any;
-  const userQuestion = messages.find((message) => message.role === "user")?.content ?? "";  try {
-    const existingEntry = await prisma.questionAnswer.findUnique({
+  let existingEntry = null;
+  const userQuestion = messages.filter((message) => message.role === "user").pop()?.content ?? ""; 
+  console.log(userQuestion);  
+  try {
+     existingEntry = await prisma.questionAnswer.findUnique({
       where: { question: userQuestion },
     });
     if (existingEntry) {
-      return new Response(existingEntry.answer);
+      console.log("Veritabanında mevcut.");
+      return new Response(existingEntry.answer, {
+        headers: { "Content-Type": "text/plain", "Cache-Control": "no-cache" }
+      });
+    }
+     else {
+      console.log("Veritabanında bulunamadı.");
     }
   } catch (error) {
     console.error("Database error:", error);
   }
-  
-  
+
   if (imageParts.length > 0) {
     modelName = "gemini-1.5-pro";
-    
     const prompt = 
     [...messages]
       .filter((message) => message.role === "user")
@@ -39,17 +44,12 @@ export async function POST(req: Request, res: Response) {
     // else build the multi-turn chat prompt
     modelName = "gemini-1.5-pro";
     promptWithParts = buildGoogleGenAIPrompt(messages);
-  
   }
 
   const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY!);
   const model = genAI.getGenerativeModel({
     model: modelName,
-    
-    
   });
-
-  
 
   console.log("MODELNAME: " + modelName);
   console.log("PROMPT WITH PARTS: ");
@@ -57,22 +57,30 @@ export async function POST(req: Request, res: Response) {
   const streamingResponse = await model.generateContentStream(promptWithParts);
   try {
     const fullResponse = await streamingResponse.response;
-    const answer = fullResponse.text();
+    const answer = await fullResponse.text();
     await prisma.questionAnswer.create({
       data: {
         question: userQuestion,
         answer: answer,
       },
     });
+  
+    // Kaydedildikten sonra hemen kontrol
+    const savedEntry = await prisma.questionAnswer.findUnique({
+      where: { question: userQuestion },
+    });
+    console.log("Yeni kaydedilen entry:", savedEntry);
   } catch (error) {
     console.error("Error saving to database:", error);
   }
+  
   return new StreamingTextResponse(GoogleGenerativeAIStream(streamingResponse));
 }
 
 
-function buildGoogleGenAIPrompt(messages: Message[] ) {
+function buildGoogleGenAIPrompt(messages: Message[]) {
   const systemInstruction = "You are a helpful AI chef specializing in providing delicious and easy-to-follow recipes. Your primary task is to suggest recipes based on user preferences, ingredients they have on hand, or specific dietary needs. You should always be polite, concise, and make sure the recipes are clear and detailed, suitable for users of all cooking levels. You go straight to the point.";
+
   return {
     contents: [
       { role: 'model', parts: [{ text: systemInstruction }] }, // Sistem mesajı olarak ekleniyor
