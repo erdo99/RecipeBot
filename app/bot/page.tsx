@@ -30,6 +30,9 @@ export default function Home() {
   const { messages, input, handleInputChange, handleSubmit, isLoading, stop } =
     useChat({
       api: "api/genai",
+      onFinish: (message) => {
+        console.log('AI response completed:', message);
+      },
     });
 
     
@@ -44,7 +47,7 @@ export default function Home() {
     
       useEffect(() => {
         // Messages dizisini console.log ile yazdır
-        console.log("Messages:", messages.length);
+        console.log("Messages:", messages);
     
         // Kaydırma fonksiyonunu çağır
         scrollToBottom();

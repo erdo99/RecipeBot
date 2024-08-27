@@ -1,48 +1,68 @@
 import { StreamingTextResponse, GoogleGenerativeAIStream, Message } from "ai";
 import { GoogleGenerativeAI, Content } from "@google/generative-ai";
 import { PrismaClient } from '@prisma/client';
-// IMPORTANT! Set the runtime to edge
+import { Readable } from 'stream';
+import { NextRequest, NextResponse } from "next/server";
+
 const prisma = new PrismaClient();
-//export const runtime = "edge";
-export async function POST(req: Request, res: Response) {
+
+// Node.js Readable'ı Web ReadableStream'e dönüştüren yardımcı fonksiyon
+function nodeStreamToWebStream(nodeStream: Readable): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      nodeStream.on('data', (chunk) => controller.enqueue(new Uint8Array(chunk)));
+      nodeStream.on('end', () => controller.close());
+      nodeStream.on('error', (err) => controller.error(err));
+    },
+  });
+}
+
+export async function POST(req: Request) {
   const reqBody = await req.json();
   const images: string[] = JSON.parse(reqBody.data.images);
   const imageParts = filesArrayToGenerativeParts(images);
   const messages: Message[] = reqBody.messages;
-  // if imageparts exist then take the last user message as prompt
-  let modelName: string;
-  let promptWithParts: any;
-  let existingEntry = null;
   const userQuestion = messages.filter((message) => message.role === "user").pop()?.content ?? ""; 
-  console.log(userQuestion);  
+  console.log("User Question:", userQuestion);  
+
   try {
-     existingEntry = await prisma.questionAnswer.findUnique({
+    const existingEntry = await prisma.questionAnswer.findUnique({
       where: { question: userQuestion },
     });
-    if (existingEntry) {
-      console.log("Veritabanında mevcut.");
-      return new Response(existingEntry.answer, {
-        headers: { "Content-Type": "text/plain", "Cache-Control": "no-cache" }
+    if (existingEntry && existingEntry.answer) {
+      console.log("Veritabanında mevcut. Cevap:", existingEntry.answer);
+
+      messages.push({
+        role: "assistant",
+        content: existingEntry.answer,
+        id: ""
       });
-    }
-     else {
-      console.log("Veritabanında bulunamadı.");
+
+      const nodeStream = Readable.from([existingEntry.answer]);
+      const webStream = nodeStreamToWebStream(nodeStream);
+      return new StreamingTextResponse(webStream, {
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+      });
+    } else {
+      console.log("Veritabanında bulunamadı veya cevap boş.");
     }
   } catch (error) {
     console.error("Database error:", error);
   }
 
+  let modelName: string;
+  let promptWithParts: any;
+
   if (imageParts.length > 0) {
-    modelName = "gemini-1.5-pro";
+    modelName = "gemini-1.5-flash";
     const prompt = 
     [...messages]
       .filter((message) => message.role === "user")
       .pop()?.content;
-    console.log(prompt);
+    console.log("Prompt with images:", prompt);
     promptWithParts = [prompt, ...imageParts];
   } else {
-    // else build the multi-turn chat prompt
-    modelName = "gemini-1.5-pro";
+    modelName = "gemini-1.5-flash";
     promptWithParts = buildGoogleGenAIPrompt(messages);
   }
 
@@ -51,39 +71,42 @@ export async function POST(req: Request, res: Response) {
     model: modelName,
   });
 
-  console.log("MODELNAME: " + modelName);
-  console.log("PROMPT WITH PARTS: ");
-  console.log(promptWithParts);
-  const streamingResponse = await model.generateContentStream(promptWithParts);
+  console.log("Model Name:", modelName);
+  console.log("Prompt With Parts:", JSON.stringify(promptWithParts));
+
   try {
+    const streamingResponse = await model.generateContentStream(promptWithParts);
+    console.log("Streaming response received");
+
     const fullResponse = await streamingResponse.response;
     const answer = await fullResponse.text();
+    console.log("Full answer:", answer);
+
     await prisma.questionAnswer.create({
       data: {
         question: userQuestion,
         answer: answer,
       },
     });
-  
-    // Kaydedildikten sonra hemen kontrol
-    const savedEntry = await prisma.questionAnswer.findUnique({
-      where: { question: userQuestion },
-    });
-    console.log("Yeni kaydedilen entry:", savedEntry);
-  } catch (error) {
-    console.error("Error saving to database:", error);
-  }
-  
-  return new StreamingTextResponse(GoogleGenerativeAIStream(streamingResponse));
-}
 
+    console.log("Answer saved to database");
+
+    const webStream = GoogleGenerativeAIStream(streamingResponse);
+    return new StreamingTextResponse(webStream, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+    });
+  } catch (error) {
+    console.error("Error in AI response or database operation:", error);
+    return new Response("An error occurred while processing your request.", { status: 500 });
+  }
+}
 
 function buildGoogleGenAIPrompt(messages: Message[]) {
   const systemInstruction = "You are a helpful AI chef specializing in providing delicious and easy-to-follow recipes. Your primary task is to suggest recipes based on user preferences, ingredients they have on hand, or specific dietary needs. You should always be polite, concise, and make sure the recipes are clear and detailed, suitable for users of all cooking levels. You go straight to the point.";
-
+  
   return {
     contents: [
-      { role: 'model', parts: [{ text: systemInstruction }] }, // Sistem mesajı olarak ekleniyor
+      { role: 'model', parts: [{ text: systemInstruction }] },
       ...messages
         .filter((message) => message.role === "user" || message.role === "assistant")
         .map((message) => ({
