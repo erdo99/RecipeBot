@@ -1,83 +1,67 @@
 "use client";
+import { useRef, useEffect } from "react";
 import { useChat } from "ai/react";
-
-import { useEffect, useRef } from "react";
-import { SignOutButton } from '../component/authButton';
-import { signIn, signOut } from '@/auth';
-import { PowerIcon } from '@heroicons/react/24/outline';
-
-import {
-  Bot,
-  Loader,
-  Loader2,
-  MoreHorizontal,
-  Plus,
-  Send,
-  User2,
-  X,
-} from "lucide-react";
 import Image from "next/image";
-import Markdown from "@/app/component/markdown";
-import { ChangeEvent, useState } from "react";
-import SelectedImages from "../component/selectedImages";
-import InputForm from "../component/inputForm";
 import Messages from "../component/messages";
-import { FcGoogle } from "react-icons/fc";
-
+import InputForm from "../component/inputForm";
 
 export default function Home() {
+  const { messages, input, handleInputChange, handleSubmit, isLoading, stop } = useChat({
+    api: "api/genai",
+    onFinish: (message) => {
+      console.log("AI response completed:", message);
+    },
+  });
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, stop } =
-    useChat({
-      api: "api/genai",
-      onFinish: (message) => {
-        console.log('AI response completed:', message);
-      },
-    });
+  const chatContainer = useRef<HTMLDivElement>(null);
+  const lastMessageRef = useRef<HTMLDivElement>(null); // Ref for the last message
 
-    
-    
-      const chatContainer = useRef<HTMLDivElement>(null);
-    
-      const scrollToBottom = () => {
-        if (chatContainer.current) {
-          chatContainer.current.scrollTo(0, chatContainer.current.scrollHeight);
-        }
-      };
-    
-      useEffect(() => {
-        // Messages dizisini console.log ile yazdır
-        console.log("Messages:", messages);
-    
-        // Kaydırma fonksiyonunu çağır
-        scrollToBottom();
-      }, [messages]);
-    
-      
+  const scrollToBottom = () => {
+    if (chatContainer.current && lastMessageRef.current) {
+      const lastMessageHeight = lastMessageRef.current.offsetHeight; // Measure the last message height
+      const scrollHeight = chatContainer.current.scrollHeight;
+      const scrollNeed = scrollHeight - lastMessageHeight; // Adjust the scroll position to keep the last message near the top
 
-      
-    
+      window.scrollTo({
+        top: scrollNeed,
+        behavior: "smooth",
+      });
+
+      console.log(`Scrolled to adjusted position. ScrollHeight: ${scrollHeight}, LastMessageHeight: ${lastMessageHeight}`);
+    } else {
+      console.log("chatContainer or lastMessageRef is null");
+    }
+  };
+
+  useEffect(() => {
+    console.log("Messages updated:", messages);
+    scrollToBottom();
+  }, [messages]);
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-12 text-lg">
-      <nav className="flex items-center justify-between bg-black w-full p-4">
-  <Image src="/logo.png" alt="Recipe Logo" width={75} height={20} className="mr-auto" />
-  <h1 className="text-xl font-semibold text-white ml-auto">
-    Talk to <span className="highlighted-text">The Recipe Bot</span>
-  </h1>
-</nav>
+    <>
+      <nav className="flex items-center justify-between bg-black w-full px-2 py-1">
+        <Image src="/logo.png" alt="Recipe Logo" width={75} height={20} className="mr-auto" />
+        <h1 className="text-xl font-semibold text-white ml-auto">
+          Talk to <span className="highlighted-text">The Recipe Bot</span>
+        </h1>
+      </nav>
 
-      {messages && <Messages messages={messages} isLoading={isLoading} />}
-      
-      
-      <InputForm
-        input={input}
-        handleInputChange={handleInputChange}
-        handleSubmit={handleSubmit}
-        isLoading={isLoading}
-        stop={stop}
-      />
-      
-    </main>
+      <main className="flex flex-col justify-between min-h-screen w-full p-4">
+        <div className="flex-1 overflow-y-auto mb-4" ref={chatContainer}>
+          <Messages messages={messages} isLoading={isLoading} lastMessageRef={lastMessageRef} />
+        </div>
+
+        <div className="sticky bottom-0 w-full">
+          <InputForm
+            input={input}
+            handleInputChange={handleInputChange}
+            handleSubmit={handleSubmit}
+            isLoading={isLoading}
+            stop={stop}
+          />
+        </div>
+      </main>
+    </>
   );
 }
