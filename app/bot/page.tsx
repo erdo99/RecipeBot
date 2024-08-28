@@ -60,15 +60,13 @@ export default function Home() {
 
   return (
     <main className="flex min-h-screen flex-col items-center p-12 text-lg">
-      <nav className="flex justify-between  flex-col items-center p-4">
-      
-          <Image src="/logo.png" alt="Recipe Logo" width={75} height={20} />
-          <h1 className="text-xl font-semibold ml-4">
-            Talk to <span className="highlighted-text">The Recipe Bot</span>
-          </h1>
-        
-        
-      </nav>
+      <nav className="flex items-center justify-between bg-black w-full p-4">
+  <Image src="/logo.png" alt="Recipe Logo" width={75} height={20} className="mr-auto" />
+  <h1 className="text-xl font-semibold text-white ml-auto">
+    Talk to <span className="highlighted-text">The Recipe Bot</span>
+  </h1>
+</nav>
+
       {messages && <Messages messages={messages} isLoading={isLoading} />}
       
       
