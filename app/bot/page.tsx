@@ -40,9 +40,9 @@ export default function Home() {
 
   return (
     <>
-      <nav className="flex items-center justify-between bg-black w-full px-2 py-1">
-        <Image src="/logo.png" alt="Recipe Logo" width={75} height={20} className="mr-auto" />
-        <h1 className="text-xl font-semibold text-white ml-auto">
+      <nav className="flex items-center justify-between bg-black w-full px-6 py-3">
+        <Image src="/logo.png" alt="Recipe Logo" width={100} height={30} className="mr-auto" />
+        <h1 className="text-3xl font-semibold text-white ml-auto">
           Talk to <span className="highlighted-text">The Recipe Bot</span>
         </h1>
       </nav>

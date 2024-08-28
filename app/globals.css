@@ -148,6 +148,11 @@ h1 {
   box-sizing: border-box;
 }
 
+span {
+  font-size: 30px;
+  
+}
+
 .image-box {
   margin: auto;
 }
