@@ -32,11 +32,7 @@ export async function POST(req: Request) {
     if (existingEntry && existingEntry.answer) {
       console.log("Veritabanında mevcut. Cevap:", existingEntry.answer);
 
-      messages.push({
-        role: "assistant",
-        content: existingEntry.answer,
-        id: ""
-      });
+      
 
       const nodeStream = Readable.from([existingEntry.answer]);
       const webStream = nodeStreamToWebStream(nodeStream);
