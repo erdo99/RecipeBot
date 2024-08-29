@@ -40,13 +40,7 @@ export default function Home() {
 
   return (
     <>
-      <nav className="flex items-center justify-between bg-black w-full px-6 py-3">
-        <Image src="/logo.png" alt="Recipe Logo" width={100} height={30} className="mr-auto" />
-        <h1 className="text-3xl font-semibold text-white ml-auto">
-          Talk to <span className="highlighted-text">The Recipe Bot</span>
-        </h1>
-      </nav>
-
+      
       <main className="flex flex-col justify-between min-h-screen w-full p-4">
         <div className="flex-1 overflow-y-auto mb-4" ref={chatContainer}>
           <Messages messages={messages} isLoading={isLoading} lastMessageRef={lastMessageRef} />
