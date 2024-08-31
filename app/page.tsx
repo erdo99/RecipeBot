@@ -18,7 +18,11 @@ export default function HomePage() {
 
     const starInterval = setInterval(createStar, 100);
 
-    return () => clearInterval(starInterval);
+    // Cleanup function to stop the star creation
+    return () => {
+      clearInterval(starInterval);
+      document.querySelectorAll('.star').forEach(star => star.remove());
+    };
   }, []);
 
   return (
