@@ -8,15 +8,16 @@ export default function HomePage() {
       const star = document.createElement('div');
       star.classList.add('star');
       star.style.left = `${Math.random() * 100}vw`;
-      star.style.animationDuration = `${Math.random() * 3 + 2}s`;
+      star.style.animationDuration = `${Math.random() * 5 + 5}s`; // Daha yavaş hız
+      star.style.transform = `rotate(${Math.random() * 360}deg)`; // Rastgele yön
       document.body.appendChild(star);
 
       setTimeout(() => {
         star.remove();
-      }, 5000);
+      }, 10000); // Daha uzun süre için
     };
 
-    const starInterval = setInterval(createStar, 100);
+    const starInterval = setInterval(createStar, 300);
 
     // Cleanup function to stop the star creation
     return () => {
@@ -52,11 +53,12 @@ export default function HomePage() {
           height: 2px;
           background: white;
           top: -2px;
+          box-shadow: 0 0 10px white, 0 0 20px white, 0 0 30px white, 0 0 40px white, 0 0 50px white; // Daha uzun iz efekti
           animation: fall linear infinite;
         }
         @keyframes fall {
           to {
-            transform: translateY(100vh);
+            transform: translateY(100vh) translateX(50vw); // Daha sola kayma
           }
         }
       `}</style>
